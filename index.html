@@ -972,18 +972,47 @@ function agentThink(input) {
 let llmEnabled = true;
 let llmOnline = false;
 
+// DeepSeek API Key锛坉emo 椤圭洰锛岀敓浜х幆澧冨簲鏀炬湇鍔＄锛?const DEEPSEEK_KEY = 'sk-0123456789abcdef'; // 鈫?閮ㄧ讲鏃舵浛鎹负鐪熷疄 Key
+
 async function callLLM(input) {
+  if (!DEEPSEEK_KEY || DEEPSEEK_KEY.startsWith('sk-01234')) {
+    console.warn('DeepSeek Key 鏈厤缃紝浣跨敤瑙勫垯寮曟搸');
+    return null;
+  }
   try {
-    const resp = await fetch('/api/agent', {
+    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${DEEPSEEK_KEY}`
+      },
       body: JSON.stringify({
-        message: input,
-        history: state.history.slice(-10).map(m => ({ role: m.role, content: m.content }))
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'system',
+            content: '浣犳槸鏅鸿兘搴ц埍 AI 鍔╂墜锛圕ockpit Copilot锛夈€俓n\n鑳藉姏锛歕n- 鎺у埗娓╁害(16-32掳C)銆佸骇妞呭姞鐑€佸鑸€侀煶涔愩€佹皼鍥寸伅(钃?绾?缁?绱?姗?鏆?鐧?绮?鍏抽棴)銆侀┚椹舵ā寮?鑸掗€?杩愬姩/鑺傝兘/闆湴)\n\n浜や簰鍘熷垯锛歕n- 鎰忓浘鏄庣‘鈫掔洿鎺ュ洖澶嶏紝璁╁墠绔鍒欏紩鎿庢墽琛孿n- 澶嶅悎璇锋眰鈫掑悓鏃惰Е鍙戝涓搷浣淺n- 妯＄硦璇锋眰鈫掑厛闂竻妤氾紝涓嶇瀻鐚淺n- 鍥炲绠€娲佸彛璇寲锛屽儚鐪熶汉搴ц埍鍔╂墜\n- 鍙棽鑱婏紝涓嶅繀姣忔閮借皟鐢ㄥ姛鑳?
+          },
+          ...state.history.slice(-8).map(m => ({
+            role: m.role === 'agent' ? 'assistant' : m.role,
+            content: m.content
+          })),
+          { role: 'user', content: input }
+        ],
+        temperature: 0.7,
+        max_tokens: 400
       })
     });
     if (!resp.ok) return null;
-    return await resp.json();
+    const data = await resp.json();
+    const msg = data.choices?.[0]?.message;
+    if (!msg) return null;
+    return {
+      type: 'message',
+      message: msg.content,
+      // 浠庡洖澶嶄腑鎻愬彇鎰忓浘浜ょ粰瑙勫垯寮曟搸鎵ц
+      rawContent: msg.content
+    };
   } catch { return null; }
 }
 
@@ -1029,11 +1058,13 @@ async function sendMsg(text) {
     showTyping(false);
     if (llmResult) {
       llmOnline = true; updateLLMStatus();
-      if (llmResult.type === 'function') {
-        executeLLMFunctions(llmResult.functions);
-        addMessage('agent', llmResult.message || '宸插畬鎴?, 0.90);
-      } else {
-        addMessage('agent', llmResult.message, 0.85);
+      // 灞曠ず LLM 鐨勮嚜鐒惰瑷€鍥炲
+      addMessage('agent', llmResult.message, 0.85);
+      // 鍚屾椂璺戣鍒欏紩鎿庢彁鍙栨搷浣滄寚浠?      const rule = agentThink(input);
+      if (rule.multi) {
+        for (const act of rule.multi) functions[act.func].execute(act.val);
+      } else if (rule.func && rule.confidence >= 0.80) {
+        functions[rule.func].execute(rule.val);
       }
       handled = true;
     } else {

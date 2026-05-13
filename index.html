@@ -968,49 +968,100 @@ function agentThink(input) {
     natural: '鎶辨瓑锛屾垜杩樹笉澶悊瑙ｆ偍鐨勬剰鎬?馃ズ\n鎮ㄥ彲浠ヨ瘯璇曪細\n鈥?銆屾湁鐐瑰喎/鐑€嶈皟鑺傛俯搴n鈥?銆屽鑸埌XXX銆嶈缃鑸猏n鈥?銆屾挱鏀鹃煶涔愩€嶅紑濮嬫挱鏀綷n鈥?銆屾皼鍥寸伅XX鑹层€嶈皟鑺傜伅鍏塡n鈥?銆屽垏鎹㈣繍鍔?鑸掗€?鑺傝兘妯″紡銆? };
 }
 
+// 鈹€鈹€ LLM 璋冪敤灞?鈹€鈹€
+let llmEnabled = true;
+let llmOnline = false;
+
+async function callLLM(input) {
+  try {
+    const resp = await fetch('/api/agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: input,
+        history: state.history.slice(-10).map(m => ({ role: m.role, content: m.content }))
+      })
+    });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch { return null; }
+}
+
+function executeLLMFunctions(fnList) {
+  for (const fn of fnList) {
+    const key = fn.name;
+    if (key && functions[key]) {
+      const a = fn.arguments;
+      const val = a.value ?? a.mode ?? a.color ?? a.query ?? a.destination ??
+                   (a.on !== undefined ? (a.on ? 'on' : 'off') : '');
+      functions[key].execute(val);
+    }
+  }
+}
+
+function updateLLMStatus() {
+  const dot = document.querySelector('.status-dot');
+  const label = document.querySelector('.status-label');
+  if (llmOnline) {
+    dot.style.background = '#34d399'; dot.style.boxShadow = '0 0 8px #34d399';
+    label.textContent = 'DeepSeek 鍦ㄧ嚎';
+  } else {
+    dot.style.background = '#fbbf24'; dot.style.boxShadow = '0 0 8px #fbbf24';
+    label.textContent = '绂荤嚎妯″紡';
+  }
+}
+
 // 鈹€鈹€ 娑堟伅澶勭悊 鈹€鈹€
 async function sendMsg(text) {
   const input = text || document.getElementById('userInput').value.trim();
   if (!input) return;
   if (!text) document.getElementById('userInput').value = '';
 
-  // 鐢ㄦ埛娑堟伅
   addMessage('user', input);
   state.history.push({ role: 'user', content: input });
-
-  // 鎵撳瓧鍔ㄧ敾
   showTyping(true);
-  await delay(600 + Math.random() * 400);
-  showTyping(false);
 
-  // Agent 鎬濊€?  const result = agentThink(input);
+  let handled = false;
 
-  if (result.multi) {
-    // 澶嶅悎鎰忓浘 鈫?涓瓑缃俊搴?鈫?鍏堝睍绀虹粨鏋滐紝璇锋眰纭
-    for (const act of result.multi) {
-      functions[act.func].execute(act.val);
+  // 浼樺厛 DeepSeek LLM
+  if (llmEnabled) {
+    const llmResult = await callLLM(input);
+    showTyping(false);
+    if (llmResult) {
+      llmOnline = true; updateLLMStatus();
+      if (llmResult.type === 'function') {
+        executeLLMFunctions(llmResult.functions);
+        addMessage('agent', llmResult.message || '宸插畬鎴?, 0.90);
+      } else {
+        addMessage('agent', llmResult.message, 0.85);
+      }
+      handled = true;
+    } else {
+      llmOnline = false; updateLLMStatus();
     }
-    addMessage('agent', result.natural, result.confidence);
-  } else if (result.func && result.confidence >= 0.80) {
-    // 楂樼疆淇″害 鈫?鐩存帴鎵ц
-    functions[result.func].execute(result.val);
-    addMessage('agent', result.natural, result.confidence);
-  } else if (result.func && result.confidence < 0.80) {
-    // 浣庣疆淇″害 鈫?灞曠ず瑙ｉ噴 + 璇锋眰纭
-    addMessage('agent', result.natural, result.confidence);
-  } else {
-    // 绾枃鏈洖澶?    addMessage('agent', result.natural, result.confidence || 0.5);
   }
 
-  // 涓婁笅鏂囨劅鐭ユ彁绀猴紙姣?3 杞彃鍏ヤ竴娆★級
+  // 瑙勫垯寮曟搸鍏滃簳
+  if (!handled) {
+    showTyping(false); await delay(300); showTyping(true); await delay(500); showTyping(false);
+    const result = agentThink(input);
+    if (result.multi) {
+      for (const act of result.multi) functions[act.func].execute(act.val);
+      addMessage('agent', result.natural, result.confidence);
+    } else if (result.func && result.confidence >= 0.80) {
+      functions[result.func].execute(result.val);
+      addMessage('agent', result.natural, result.confidence);
+    } else if (result.func && result.confidence < 0.80) {
+      addMessage('agent', result.natural, result.confidence);
+    } else {
+      addMessage('agent', result.natural, result.confidence || 0.5);
+    }
+  }
+
   if (state.history.length % 3 === 0 && state.contextAware) {
     const tips = getContextSuggestions();
-    if (tips.length > 0) {
-      await delay(1200);
-      addMessage('agent', '馃挕 ' + tips[0], 0.7);
-    }
+    if (tips.length > 0) { await delay(1200); addMessage('agent', '馃挕 ' + tips[0], 0.7); }
   }
-
   scrollChat();
 }
 

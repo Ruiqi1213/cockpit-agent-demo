@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能座舱 AI Agent · Cockpit Copilot</title>
+<style>
+  :root {
+    --bg: #080c14;
+    --surface: rgba(18, 22, 36, 0.85);
+    --border: rgba(255,255,255,0.06);
+    --accent: #00d4ff;
+    --accent-dim: rgba(0,212,255,0.25);
+    --purple: #a78bfa;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── Background particles ── */
+  .bg-grid {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(0,212,255,0.06) 0%, transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(167,139,250,0.05) 0%, transparent 50%),
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    position: relative; z-index: 2;
+    display: flex; align-items: center; gap: 20px;
+    padding: 10px 24px;
+    background: rgba(10,13,20,0.7);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar .time { font-size: 15px; font-weight: 600; }
+  .topbar .weather { font-size: 13px; color: var(--text2); }
+  .topbar .weather span { color: var(--amber); margin-right: 2px; }
+  .topbar .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-left: auto; box-shadow: 0 0 8px var(--green); }
+  .topbar .status-label { font-size: 12px; color: var(--text2); }
+  .topbar .brand {
+    margin-left: auto;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  /* ── Main layout ── */
+  .main {
+    position: relative; z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    height: calc(100vh - 44px);
+    gap: 1px;
+    background: var(--border);
+  }
+
+  /* ── Dashboard ── */
+  .dashboard {
+    background: var(--bg);
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 14px;
+    overflow-y: auto;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    backdrop-filter: blur(8px);
+    transition: all 0.35s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .card:hover { border-color: rgba(255,255,255,0.12); }
+  .card.active {
+    border-color: var(--accent-dim);
+    box-shadow: 0 0 20px rgba(0,212,255,0.08), inset 0 0 20px rgba(0,212,255,0.03);
+  }
+  .card .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text2);
+    margin-bottom: 8px;
+  }
+  .card .value {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    transition: color 0.4s;
+  }
+  .card .unit { font-size: 14px; font-weight: 400; color: var(--text2); margin-left: 2px; }
+  .card .sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+
+  /* Temperature */
+  .temp-ring {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 700;
+    transition: border-color 0.5s;
+  }
+  .temp-ring.cold { border-color: var(--accent); box-shadow: 0 0 16px rgba(0,212,255,0.2); }
+  .temp-ring.warm { border-color: var(--amber); box-shadow: 0 0 16px rgba(251,191,36,0.2); }
+  .temp-row { display: flex; align-items: center; gap: 14px; }
+
+  /* Navigation card */
+  .nav-card .mini-map {
+    height: 100px;
+    background: rgba(0,0,0,0.3);
+    border-radius: var(--radius-sm);
+    position: relative;
+    overflow: hidden;
+  }
+  .nav-card .route-line {
+    position: absolute;
+    bottom: 20px; left: 20px;
+    width: 80%;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--purple));
+    border-radius: 2px;
+    animation: routePulse 2s ease-in-out infinite;
+  }
+  @keyframes routePulse {
+    0%,100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  .nav-card .car-dot {
+    position: absolute;
+    bottom: 14px; left: 16px;
+    width: 12px; height: 12px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--accent);
+    animation: carMove 4s ease-in-out infinite;
+  }
+  @keyframes carMove {
+    0% { left: 16px; }
+    50% { left: 70%; }
+    100% { left: 16px; }
+  }
+  .nav-dest { font-size: 13px; margin-top: 6px; color: var(--text2); }
+  .nav-dest strong { color: var(--text); }
+
+  /* Music */
+  .music-card .eq-bars { display: flex; align-items: flex-end; gap: 3px; height: 40px; margin-top: 4px; }
+  .music-card .eq-bar {
+    width: 4px; background: var(--accent);
+    border-radius: 2px;
+    animation: eqAnim 1.2s ease-in-out infinite;
+  }
+  .music-card .eq-bar:nth-child(1) { animation-delay: 0s; height: 18px; }
+  .music-card .eq-bar:nth-child(2) { animation-delay: 0.15s; height: 28px; }
+  .music-card .eq-bar:nth-child(3) { animation-delay: 0.3s; height: 22px; }
+  .music-card .eq-bar:nth-child(4) { animation-delay: 0.45s; height: 35px; }
+  .music-card .eq-bar:nth-child(5) { animation-delay: 0.6s; height: 20px; }
+  .music-card .eq-bar:nth-child(6) { animation-delay: 0.75s; height: 30px; }
+  .music-card .eq-bar:nth-child(7) { animation-delay: 0.9s; height: 16px; }
+  @keyframes eqAnim {
+    0%,100% { transform: scaleY(0.5); opacity: 0.5; }
+    50% { transform: scaleY(1); opacity: 1; }
+  }
+
+  /* Ambient Light */
+  .light-circle {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    transition: background 0.6s, box-shadow 0.6s;
+  }
+  .light-row { display: flex; align-items: center; gap: 14px; }
+
+  /* Drive Mode */
+  .mode-badge {
+    display: inline-block;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    transition: all 0.4s;
+  }
+  .mode-comfort { background: rgba(52,211,153,0.15); color: var(--green); }
+  .mode-sport { background: rgba(248,113,113,0.15); color: var(--red); }
+  .mode-eco { background: rgba(0,212,255,0.15); color: var(--accent); }
+  .mode-snow { background: rgba(167,139,250,0.15); color: var(--purple); }
+
+  /* Speedometer */
+  .speed-gauge {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background: conic-gradient(var(--accent) 0deg 200deg, rgba(255,255,255,0.05) 200deg 360deg);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .speed-inner {
+    width: 74px; height: 74px;
+    border-radius: 50%;
+    background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .speed-num { font-size: 28px; font-weight: 700; line-height: 1; }
+  .speed-unit { font-size: 10px; color: var(--text2); }
+
+  /* ── Assistant Panel ── */
+  .assistant {
+    background: rgba(14,18,30,0.9);
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+  }
+  .assistant-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .assistant-header .ai-icon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .assistant-header .ai-title { font-weight: 600; font-size: 14px; }
+  .assistant-header .ai-sub { font-size: 11px; color: var(--text2); }
+
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .msg {
+    max-width: 88%;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13.5px;
+    line-height: 1.55;
+    animation: msgIn 0.3s ease;
+  }
+  @keyframes msgIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .msg.user {
+    align-self: flex-end;
+    background: rgba(0,212,255,0.12);
+    border: 1px solid rgba(0,212,255,0.2);
+  }
+  .msg.agent {
+    align-self: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+  .msg .conf {
+    font-size: 10px;
+    margin-top: 6px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .conf-high { color: var(--green); }
+  .conf-mid { color: var(--amber); }
+  .conf-low { color: var(--red); }
+
+  .typing {
+    display: none;
+    align-self: flex-start;
+    padding: 10px 14px;
+    gap: 4px;
+  }
+  .typing.show { display: flex; }
+  .typing span {
+    width: 6px; height: 6px;
+    background: var(--text2);
+    border-radius: 50%;
+    animation: bounce 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%,60%,100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+  }
+
+  /* Suggestion chips */
+  .chips {
+    display: flex; gap: 8px; padding: 0 16px 10px;
+    flex-wrap: wrap;
+  }
+  .chip {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .chip:hover {
+    border-color: var(--accent-dim);
+    color: var(--accent);
+    background: rgba(0,212,255,0.06);
+  }
+
+  /* Input */
+  .input-area {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px;
+  }
+  .input-area input {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 13.5px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .input-area input:focus { border-color: var(--accent-dim); }
+  .input-area input::placeholder { color: rgba(148,163,184,0.5); }
+  .btn {
+    background: linear-gradient(135deg, var(--accent), #0099cc);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 10px 18px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover { box-shadow: 0 0 16px rgba(0,212,255,0.3); transform: translateY(-1px); }
+  .btn.ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    font-size: 11px;
+    padding: 6px 12px;
+  }
+  .btn.ghost:hover { border-color: var(--accent-dim); color: var(--accent); box-shadow: none; transform: none; }
+
+  /* Demo overlay */
+  .demo-banner {
+    position: fixed; top: 50px; left: 50%; transform: translateX(-50%); z-index: 10;
+    background: rgba(52,211,153,0.12);
+    border: 1px solid rgba(52,211,153,0.3);
+    border-radius: 20px;
+    padding: 6px 18px;
+    font-size: 12px;
+    color: var(--green);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .demo-banner:hover { background: rgba(52,211,153,0.18); }
+  .demo-banner .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+
+<!-- Demo banner -->
+<div class="demo-banner" id="demoBtn" title="自动演示全部功能">
+  <span class="dot"></span> 演示模式
+</div>
+
+<!-- Top bar -->
+<div class="topbar">
+  <span class="time" id="timeDisplay">14:30</span>
+  <span class="weather"><span>☀️</span> 晴 · 24°C</span>
+  <span class="status-dot"></span><span class="status-label">Agent 在线</span>
+  <span class="brand">Cockpit Copilot</span>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Dashboard -->
+  <div class="dashboard">
+
+    <!-- Speed -->
+    <div class="card">
+      <div class="label">⏱ 行驶状态</div>
+      <div style="display:flex; align-items:center; gap:16px;">
+        <div class="speed-gauge">
+          <div class="speed-inner">
+            <span class="speed-num" id="speedVal">0</span>
+            <span class="speed-unit">km/h</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--text2);">续航</div>
+          <div style="font-size:20px;font-weight:700;">312 <span style="font-size:12px;color:var(--text2);">km</span></div>
+          <div style="font-size:12px;color:var(--green);">⚡ 82%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Temperature -->
+    <div class="card" id="tempCard">
+      <div class="label">🌡 座舱温度</div>
+      <div class="temp-row">
+        <div class="temp-ring cold" id="tempRing">24°</div>
+        <div>
+          <div class="value" style="font-size:28px;" id="tempVal">24<span class="unit">°C</span></div>
+          <div class="sub">AUTO · 外循环</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px;" id="seatHeat">座椅加热 · 关闭</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="card nav-card" id="navCard">
+      <div class="label">🗺 导航</div>
+      <div class="mini-map">
+        <div class="route-line"></div>
+        <div class="car-dot"></div>
+      </div>
+      <div class="nav-dest" id="navDest">未设置目的地</div>
+    </div>
+
+    <!-- Music -->
+    <div class="card music-card" id="musicCard">
+      <div class="label">🎵 媒体</div>
+      <div style="font-size:13px;font-weight:600;" id="musicTitle">未播放</div>
+      <div class="eq-bars" id="eqBars">
+        <div class="eq-bar" style="height:6px;"></div><div class="eq-bar" style="height:6px;"></div>
+        <div class="eq-bar" style="height:6px;"></div><div class="eq-bar" style="height:6px;"></div>
+        <div class="eq-bar" style="height:6px;"></div><div class="eq-bar" style="height:6px;"></div>
+        <div class="eq-bar" style="height:6px;"></div>
+      </div>
+    </div>
+
+    <!-- Ambient Light -->
+    <div class="card" id="lightCard">
+      <div class="label">💡 氛围灯</div>
+      <div class="light-row">
+        <div class="light-circle" id="lightCircle" style="background:#334155;box-shadow:none;"></div>
+        <div>
+          <div style="font-size:14px;font-weight:600;" id="lightName">关闭</div>
+          <div class="sub" id="lightBright">亮度 0%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drive Mode -->
+    <div class="card" id="modeCard">
+      <div class="label">🚗 驾驶模式</div>
+      <div style="margin-top:4px;">
+        <span class="mode-badge mode-comfort" id="modeBadge">COMFORT</span>
+      </div>
+      <div class="sub" id="modeDesc">标准舒适调校</div>
+    </div>
+
+  </div>
+
+  <!-- Assistant -->
+  <div class="assistant">
+    <div class="assistant-header">
+      <div class="ai-icon">🤖</div>
+      <div>
+        <div class="ai-title">座舱助手</div>
+        <div class="ai-sub">语音/文字 · 持续在线</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn ghost" onclick="clearChat()">清空</button>
+      </div>
+    </div>
+
+    <div class="chat-area" id="chatArea">
+      <div class="msg agent">
+        你好，我是座舱 AI 助手。<br>
+        你可以用自然语言控制温度、导航、音乐、氛围灯和驾驶模式。<br>
+        试试说「有点冷」「导航到公司」「放点音乐」👋
+      </div>
+    </div>
+
+    <div class="typing" id="typing">
+      <span></span><span></span><span></span>
+    </div>
+
+    <div class="chips" id="chipRow">
+      <span class="chip" onclick="sendMsg('有点冷')">🥶 有点冷</span>
+      <span class="chip" onclick="sendMsg('导航到最近充电站')">🔌 找充电站</span>
+      <span class="chip" onclick="sendMsg('播放轻音乐')">🎵 放音乐</span>
+      <span class="chip" onclick="sendMsg('切换运动模式')">🏎️ 运动模式</span>
+      <span class="chip" onclick="sendMsg('氛围灯调成蓝色')">💙 蓝色灯光</span>
+    </div>
+
+    <div class="input-area">
+      <input type="text" id="userInput" placeholder="说出你的需求……" onkeydown="if(event.key==='Enter')sendMsg()">
+      <button class="btn" onclick="sendMsg()">发送</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  智能座舱 AI Agent 核心引擎
+//  Cockpit Copilot v1.0
+// ═══════════════════════════════════════
+
+// ── 座舱状态 ──
+const state = {
+  temperature: 24,
+  seatHeat: false,
+  navigation: null,
+  music: null,
+  ambientLight: { color: '#334155', name: '关闭', brightness: 0 },
+  driveMode: 'comfort',
+  speed: 0,
+  history: [],
+  contextAware: true
+};
+
+// ── 上下文感知数据 ──
+const context = {
+  time: '14:30',
+  hour: 14,
+  weather: '晴',
+  outsideTemp: 24,
+  battery: 82
+};
+
+// ── 耗时模拟（让交互感觉自然） ──
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Function Definitions（Agent 可调用的能力） ──
+const functions = {
+  set_temperature: {
+    name: 'set_temperature',
+    description: '设置座舱温度',
+    params: ['value'],
+    validate: (v) => !isNaN(v) && v >= 16 && v <= 32,
+    execute(val) {
+      const v = parseInt(val);
+      state.temperature = v;
+      updateTempUI();
+      return { action: `温度已调至 ${v}°C`, detail: this.description };
+    }
+  },
+  set_seat_heat: {
+    name: 'set_seat_heat',
+    description: '开关座椅加热',
+    params: ['on/off'],
+    execute(val) {
+      state.seatHeat = (val === 'on' || val === 'true' || val === '开');
+      updateTempUI();
+      return { action: `座椅加热已${state.seatHeat ? '开启' : '关闭'}` };
+    }
+  },
+  navigate_to: {
+    name: 'navigate_to',
+    description: '设置导航目的地',
+    params: ['destination'],
+    execute(val) {
+      state.navigation = val;
+      updateNavUI();
+      return { action: `导航已设至「${val}」`, detail: '预计到达 14:55' };
+    }
+  },
+  play_music: {
+    name: 'play_music',
+    description: '播放音乐',
+    params: ['query'],
+    execute(val) {
+      state.music = val;
+      updateMusicUI();
+      return { action: `正在播放「${val}」` };
+    }
+  },
+  set_ambient_light: {
+    name: 'set_ambient_light',
+    description: '设置氛围灯颜色和亮度',
+    params: ['color', 'brightness'],
+    execute(val) {
+      const colorMap = {
+        '蓝': '#3b82f6', '蓝色': '#3b82f6',
+        '红': '#ef4444', '红色': '#ef4444',
+        '绿': '#22c55e', '绿色': '#22c55e',
+        '紫': '#a855f7', '紫色': '#a855f7',
+        '橙': '#f97316', '橙色': '#f97316',
+        '暖': '#f59e0b', '暖色': '#f59e0b',
+        '白': '#e2e8f0', '白色': '#e2e8f0',
+        '粉': '#ec4899', '粉色': '#ec4899',
+        '关闭': '#334155', '关': '#334155', '暗': '#334155'
+      };
+      const c = colorMap[val] || '#3b82f6';
+      const nameMap = { '#3b82f6':'冰蓝','#ef4444':'炽红','#22c55e':'翠绿',
+        '#a855f7':'星紫','#f97316':'暖橙','#f59e0b':'琥珀','#e2e8f0':'柔白',
+        '#ec4899':'樱粉','#334155':'关闭' };
+      state.ambientLight = { color: c, name: nameMap[c] || val, brightness: c === '#334155' ? 0 : 70 };
+      updateLightUI();
+      return { action: `氛围灯 → ${state.ambientLight.name}`, detail: `亮度 ${state.ambientLight.brightness}%` };
+    }
+  },
+  set_drive_mode: {
+    name: 'set_drive_mode',
+    description: '切换驾驶模式',
+    params: ['mode'],
+    execute(val) {
+      const modeMap = {
+        '舒适': 'comfort', '舒适模式': 'comfort', 'comfort': 'comfort',
+        '运动': 'sport', '运动模式': 'sport', 'sport': 'sport',
+        '节能': 'eco', 'eco模式': 'eco', '节能模式': 'eco', 'eco': 'eco',
+        '雪地': 'snow', '雪地模式': 'snow', 'snow': 'snow'
+      };
+      state.driveMode = modeMap[val] || 'comfort';
+      updateModeUI();
+      const modeNames = { comfort:'舒适模式', sport:'运动模式', eco:'节能模式', snow:'雪地模式' };
+      const modeDescs = { comfort:'悬挂舒适 · 转向轻盈', sport:'悬挂硬化 · 动力响应敏捷',
+        eco:'最优能效 · 空调降功率', snow:'低扭输出 · 防滑优先' };
+      return { action: `驾驶模式 → ${modeNames[state.driveMode]}`, detail: modeDescs[state.driveMode] };
+    }
+  }
+};
+
+// ── UI 更新函数 ──
+function updateTempUI() {
+  document.getElementById('tempVal').innerHTML = state.temperature + '<span class="unit">°C</span>';
+  document.getElementById('tempRing').textContent = state.temperature + '°';
+  const ring = document.getElementById('tempRing');
+  ring.className = 'temp-ring ' + (state.temperature <= 21 ? 'cold' : 'warm');
+  document.getElementById('seatHeat').textContent = '座椅加热 · ' + (state.seatHeat ? '已开启 🔥' : '关闭');
+  flashCard('tempCard');
+}
+function updateNavUI() {
+  document.getElementById('navDest').innerHTML = state.navigation
+    ? '目的地：<strong>' + state.navigation + '</strong> · 预计 15:05 到达'
+    : '未设置目的地';
+  flashCard('navCard');
+}
+function updateMusicUI() {
+  document.getElementById('musicTitle').textContent = state.music || '未播放';
+  const bars = document.querySelectorAll('#eqBars .eq-bar');
+  bars.forEach((b,i) => {
+    if (state.music) {
+      b.style.height = (12 + Math.random()*24) + 'px';
+      b.style.animationPlayState = 'running';
+    } else {
+      b.style.height = '6px';
+      b.style.animationPlayState = 'paused';
+    }
+  });
+  flashCard('musicCard');
+}
+function updateLightUI() {
+  const l = state.ambientLight;
+  document.getElementById('lightCircle').style.background = l.color;
+  document.getElementById('lightCircle').style.boxShadow = l.brightness > 0
+    ? '0 0 24px ' + l.color + ', 0 0 48px ' + l.color + '44'
+    : 'none';
+  document.getElementById('lightName').textContent = l.name;
+  document.getElementById('lightBright').textContent = '亮度 ' + l.brightness + '%';
+  flashCard('lightCard');
+}
+function updateModeUI() {
+  const modeNames = { comfort:'舒适模式', sport:'运动模式', eco:'节能模式', snow:'雪地模式' };
+  const modeDescs = { comfort:'悬挂舒适 · 转向轻盈', sport:'悬挂硬化 · 动力响应敏捷',
+    eco:'最优能效 · 空调降功率', snow:'低扭输出 · 防滑优先' };
+  const badge = document.getElementById('modeBadge');
+  badge.textContent = modeNames[state.driveMode].toUpperCase();
+  badge.className = 'mode-badge mode-' + state.driveMode;
+  document.getElementById('modeDesc').textContent = modeDescs[state.driveMode];
+  flashCard('modeCard');
+}
+function flashCard(id) {
+  const el = document.getElementById(id);
+  el.classList.add('active');
+  setTimeout(() => el.classList.remove('active'), 800);
+}
+
+// ── 上下文感知引擎 ──
+function getContextSuggestions() {
+  const tips = [];
+  if (context.hour >= 22 || context.hour < 6) {
+    tips.push('检测到夜间驾驶，建议调暗仪表盘亮度并开启柔白氛围灯');
+  }
+  if (context.hour >= 6 && context.hour < 9) {
+    tips.push('早上好！需要导航到常去地点吗？');
+  }
+  if (state.temperature < 20 && !state.seatHeat) {
+    tips.push('当前温度偏低，需要开启座椅加热吗？');
+  }
+  if (state.driveMode === 'sport' && state.ambientLight.name === '关闭') {
+    tips.push('运动模式下推荐配合红色氛围灯，增强驾驶氛围感');
+  }
+  if (context.outsideTemp > 30 && state.temperature > 26) {
+    tips.push('室外温度较高，建议将空调设在 24-26°C 以平衡舒适度和能耗');
+  }
+  return tips;
+}
+
+// ── Agent 意图识别引擎（模拟 LLM Function Calling） ──
+function agentThink(input) {
+  const q = input.trim();
+  const lower = q.toLowerCase();
+
+  // ===== 温度相关 =====
+  const tempMatch = q.match(/(\d+)\s*度/);
+  if (tempMatch) {
+    const v = parseInt(tempMatch[1]);
+    if (v >= 16 && v <= 32) {
+      return { func: 'set_temperature', val: v, confidence: 0.95,
+        natural: `好的，温度调至 ${v}°C ✅` };
+    }
+  }
+  if (lower.includes('冷') || lower.includes('凉') || lower.includes('冻')) {
+    const target = Math.min(state.temperature + 2, 32);
+    const extras = [];
+    if (state.temperature <= 18) extras.push('需要同时打开座椅加热吗？');
+    return { func: 'set_temperature', val: target, confidence: 0.92,
+      natural: `检测到您感觉偏冷，温度 ${state.temperature}→${target}°C 🔥${extras.length ? '\n' + extras.join('\n') : ''}` };
+  }
+  if (lower.includes('热') || lower.includes('闷')) {
+    const target = Math.max(state.temperature - 2, 16);
+    return { func: 'set_temperature', val: target, confidence: 0.92,
+      natural: `帮您降温，温度 ${state.temperature}→${target}°C ❄️` };
+  }
+  if (lower.includes('座椅加热') || lower.includes('加热')) {
+    const on = !lower.includes('关') && !lower.includes('停');
+    return { func: 'set_seat_heat', val: on ? 'on' : 'off', confidence: 0.95,
+      natural: on ? '座椅加热已开启 🔥' : '座椅加热已关闭' };
+  }
+
+  // ===== 导航相关 =====
+  const navMatch = q.match(/导航到(.+)/) || q.match(/去(.+)/) || q.match(/到(.+)去/);
+  if (navMatch || lower.includes('充电') || lower.includes('加油站') || lower.includes('回家') || lower.includes('公司')) {
+    let dest = '';
+    if (navMatch) dest = navMatch[1].trim();
+    else if (lower.includes('充电')) dest = '最近充电站（特来电 · 1.2km）';
+    else if (lower.includes('加油站')) dest = '最近加油站（中石化 · 0.8km）';
+    else if (lower.includes('回家')) dest = '家（海淀区中关村）';
+    else if (lower.includes('公司')) dest = '公司';
+    if (dest) {
+      return { func: 'navigate_to', val: dest, confidence: 0.90,
+        natural: `已为您规划到「${dest}」的路线 🗺️\n预计到达时间：14:55` };
+    }
+  }
+
+  // ===== 音乐相关 =====
+  if (lower.includes('音乐') || lower.includes('播放') || lower.includes('放歌') || lower.includes('听')) {
+    let genre = '轻音乐';
+    if (lower.includes('轻')) genre = '钢琴轻音乐集';
+    else if (lower.includes('摇滚') || lower.includes('嗨')) genre = '驾驶摇滚歌单';
+    else if (lower.includes('古典')) genre = '古典乐精选';
+    else if (lower.includes('民谣')) genre = '民谣在路上';
+    else if (lower.includes('电子')) genre = '电子驰放';
+    return { func: 'play_music', val: genre, confidence: 0.88,
+      natural: `为您播放「${genre}」🎵` };
+  }
+
+  // ===== 氛围灯相关 =====
+  const lightColors = ['蓝','红','绿','紫','橙','暖','白','粉','关'];
+  for (const c of lightColors) {
+    if (lower.includes('氛围灯') && (lower.includes(c) || c === '关')) {
+      return { func: 'set_ambient_light', val: c, confidence: 0.93,
+        natural: `氛围灯 → ${c === '关' ? '已关闭' : c + '色'} 💡` };
+    }
+  }
+  if (lower.includes('灯光') || lower.includes('氛围灯')) {
+    if (lower.includes('暗') || lower.includes('关') || lower.includes('灭')) {
+      return { func: 'set_ambient_light', val: '关闭', confidence: 0.90,
+        natural: '氛围灯已关闭 🌙' };
+    }
+    return { func: 'set_ambient_light', val: '蓝', confidence: 0.70,
+      natural: '为您开启冰蓝氛围灯 💙\n（您可以指定其他颜色：红色、紫色、暖色等）' };
+  }
+
+  // ===== 驾驶模式 =====
+  if (lower.includes('舒适模式') || lower.includes('舒适')) {
+    return { func: 'set_drive_mode', val: '舒适', confidence: 0.95,
+      natural: '已切换至舒适模式 🚗\n悬挂变软，转向更轻盈' };
+  }
+  if (lower.includes('运动模式') || lower.includes('运动')) {
+    return { func: 'set_drive_mode', val: '运动', confidence: 0.95,
+      natural: '已切换至运动模式 🏎️\n动力响应更敏捷，建议搭配红色氛围灯' };
+  }
+  if (lower.includes('节能') || lower.includes('省电') || lower.includes('eco')) {
+    return { func: 'set_drive_mode', val: '节能', confidence: 0.95,
+      natural: '已切换至节能模式 🌿\n预计续航增加 8%，空调功率已降低' };
+  }
+  if (lower.includes('雪地') || lower.includes('防滑')) {
+    return { func: 'set_drive_mode', val: '雪地', confidence: 0.95,
+      natural: '已切换至雪地模式 ❄️\n低扭输出，防滑优先' };
+  }
+
+  // ===== 复合意图检测 =====
+  // "切换到运动模式，氛围灯调成红色"
+  if (lower.includes('运动') && lower.includes('红')) {
+    // Multi-step: execute both
+    return { multi: [
+      { func: 'set_drive_mode', val: '运动' },
+      { func: 'set_ambient_light', val: '红' }
+    ], confidence: 0.65,
+      natural: '收到！同时执行：\n• 切换至运动模式 🏎️\n• 氛围灯 → 炽红 💡\n这样调整可以吗？' };
+  }
+
+  // ===== 模糊意图 =====
+  if (lower.includes('暗') || lower.includes('太亮')) {
+    return { func: 'set_ambient_light', val: '关闭', confidence: 0.55,
+      natural: '您是指关闭氛围灯，还是调暗仪表盘亮度？我先帮您关闭氛围灯，如需调整仪表盘请说「调暗仪表盘」🌙' };
+  }
+
+  if (lower.includes('跟上次一样') || lower.includes('还是')) {
+    return { confidence: 0.60,
+      natural: '让我想想上次的配置……是「舒适模式 + 冰蓝氛围灯 + 22°C + 轻音乐」吗？\n说是或否，我立刻执行 👀',
+      needsConfirm: true };
+  }
+
+  // ===== 闲聊/问候 =====
+  if (lower.includes('你好') || lower.includes('hi') || lower.includes('hello')) {
+    return { confidence: 0.99, natural: '你好！👋 我是座舱助手，温度、导航、音乐、灯光、驾驶模式随时听你调遣。' };
+  }
+  if (lower.includes('谢谢') || lower.includes('多谢')) {
+    return { confidence: 0.99, natural: '不客气！安全驾驶，有需要随时叫我 😊' };
+  }
+
+  // ===== 兜底 =====
+  return { confidence: 0.30,
+    natural: '抱歉，我还不太理解您的意思 🥺\n您可以试试：\n• 「有点冷/热」调节温度\n• 「导航到XXX」设置导航\n• 「播放音乐」开始播放\n• 「氛围灯XX色」调节灯光\n• 「切换运动/舒适/节能模式」' };
+}
+
+// ── 消息处理 ──
+async function sendMsg(text) {
+  const input = text || document.getElementById('userInput').value.trim();
+  if (!input) return;
+  if (!text) document.getElementById('userInput').value = '';
+
+  // 用户消息
+  addMessage('user', input);
+  state.history.push({ role: 'user', content: input });
+
+  // 打字动画
+  showTyping(true);
+  await delay(600 + Math.random() * 400);
+  showTyping(false);
+
+  // Agent 思考
+  const result = agentThink(input);
+
+  if (result.multi) {
+    // 复合意图 → 中等置信度 → 先展示结果，请求确认
+    for (const act of result.multi) {
+      functions[act.func].execute(act.val);
+    }
+    addMessage('agent', result.natural, result.confidence);
+  } else if (result.func && result.confidence >= 0.80) {
+    // 高置信度 → 直接执行
+    functions[result.func].execute(result.val);
+    addMessage('agent', result.natural, result.confidence);
+  } else if (result.func && result.confidence < 0.80) {
+    // 低置信度 → 展示解释 + 请求确认
+    addMessage('agent', result.natural, result.confidence);
+  } else {
+    // 纯文本回复
+    addMessage('agent', result.natural, result.confidence || 0.5);
+  }
+
+  // 上下文感知提示（每 3 轮插入一次）
+  if (state.history.length % 3 === 0 && state.contextAware) {
+    const tips = getContextSuggestions();
+    if (tips.length > 0) {
+      await delay(1200);
+      addMessage('agent', '💡 ' + tips[0], 0.7);
+    }
+  }
+
+  scrollChat();
+}
+
+function addMessage(role, content, confidence) {
+  const chat = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+
+  let html = content.replace(/\n/g, '<br>');
+  if (confidence !== undefined && role === 'agent') {
+    let confClass = 'conf-high';
+    let confLabel = '高置信度 · 自动执行';
+    if (confidence < 0.60) { confClass = 'conf-low'; confLabel = '低置信度 · 需确认'; }
+    else if (confidence < 0.80) { confClass = 'conf-mid'; confLabel = '中置信度 · 建议确认'; }
+    html += `<div class="conf ${confClass}"><span style="font-size:14px;">${
+      confidence >= 0.80 ? '✅' : confidence >= 0.60 ? '⚠️' : '🤔'
+    }</span> ${confLabel} · ${Math.round(confidence * 100)}%</div>`;
+  }
+
+  div.innerHTML = html;
+  chat.appendChild(div);
+  scrollChat();
+}
+
+function showTyping(show) {
+  document.getElementById('typing').className = 'typing' + (show ? ' show' : '');
+}
+
+function scrollChat() {
+  const chat = document.getElementById('chatArea');
+  setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 50);
+}
+
+function clearChat() {
+  const chat = document.getElementById('chatArea');
+  chat.innerHTML = `
+    <div class="msg agent">
+      你好，我是座舱 AI 助手。<br>
+      你可以用自然语言控制温度、导航、音乐、氛围灯和驾驶模式。<br>
+      试试说「有点冷」「导航到公司」「放点音乐」👋
+    </div>`;
+  state.history = [];
+}
+
+// ── 演示模式 ──
+let demoRunning = false;
+async function runDemo() {
+  if (demoRunning) return;
+  demoRunning = true;
+  document.getElementById('demoBtn').style.opacity = '0.5';
+  const demos = [
+    '有点冷',
+    '打开座椅加热',
+    '导航到最近充电站',
+    '播放古典音乐',
+    '切换运动模式，氛围灯调成红色',
+    '还是切换回舒适模式吧',
+    '谢谢'
+  ];
+  for (const msg of demos) {
+    if (!demoRunning) break;
+    await sendMsg(msg);
+    await delay(1800);
+  }
+  demoRunning = false;
+  document.getElementById('demoBtn').style.opacity = '1';
+}
+document.getElementById('demoBtn').addEventListener('click', () => {
+  if (demoRunning) { demoRunning = false; return; }
+  clearChat();
+  setTimeout(runDemo, 300);
+});
+
+// ── 时间更新 ──
+function updateTime() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('timeDisplay').textContent = h + ':' + m;
+  context.hour = now.getHours();
+  context.time = h + ':' + m;
+  // 模拟行驶速度
+  state.speed = Math.floor(30 + Math.random() * 60);
+  document.getElementById('speedVal').textContent = state.speed;
+}
+setInterval(updateTime, 3000);
+updateTime();
+
+// ── 初始状态 ──
+updateTempUI();
+updateNavUI();
+updateMusicUI();
+updateLightUI();
+updateModeUI();
+</script>
+
+</body>
+</html>

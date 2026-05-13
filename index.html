@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>智能座舱 AI Agent · Cockpit Copilot</title>
+<title>鏅鸿兘搴ц埍 AI Agent 路 Cockpit Copilot</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"> </script>
 <style>
   :root {
     --bg: #080c14;
@@ -30,7 +32,7 @@
     user-select: none;
   }
 
-  /* ── Background particles ── */
+  /* 鈹€鈹€ Background particles 鈹€鈹€ */
   .bg-grid {
     position: fixed; inset: 0; pointer-events: none; z-index: 0;
     background-image:
@@ -41,7 +43,7 @@
     background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
   }
 
-  /* ── Top bar ── */
+  /* 鈹€鈹€ Top bar 鈹€鈹€ */
   .topbar {
     position: relative; z-index: 2;
     display: flex; align-items: center; gap: 20px;
@@ -64,7 +66,7 @@
     text-transform: uppercase;
   }
 
-  /* ── Main layout ── */
+  /* 鈹€鈹€ Main layout 鈹€鈹€ */
   .main {
     position: relative; z-index: 1;
     display: grid;
@@ -74,7 +76,7 @@
     background: var(--border);
   }
 
-  /* ── Dashboard ── */
+  /* 鈹€鈹€ Dashboard 鈹€鈹€ */
   .dashboard {
     background: var(--bg);
     padding: 20px;
@@ -129,42 +131,27 @@
   .temp-row { display: flex; align-items: center; gap: 14px; }
 
   /* Navigation card */
-  .nav-card .mini-map {
-    height: 100px;
-    background: rgba(0,0,0,0.3);
+  .nav-card .map-container {
+    height: 140px;
     border-radius: var(--radius-sm);
-    position: relative;
     overflow: hidden;
+    border: 1px solid var(--border);
   }
-  .nav-card .route-line {
-    position: absolute;
-    bottom: 20px; left: 20px;
-    width: 80%;
-    height: 2px;
-    background: linear-gradient(90deg, var(--accent), var(--purple));
-    border-radius: 2px;
-    animation: routePulse 2s ease-in-out infinite;
+  .nav-card .map-container .leaflet-container {
+    height: 100%;
+    width: 100%;
+    background: #0d1117 !important;
   }
-  @keyframes routePulse {
-    0%,100% { opacity: 0.6; }
-    50% { opacity: 1; }
+  .nav-card .route-summary {
+    display: flex; gap: 16px; margin-top: 8px;
+    font-size: 12px; color: var(--text2);
   }
-  .nav-card .car-dot {
-    position: absolute;
-    bottom: 14px; left: 16px;
-    width: 12px; height: 12px;
-    background: var(--accent);
-    border-radius: 50%;
-    box-shadow: 0 0 12px var(--accent);
-    animation: carMove 4s ease-in-out infinite;
-  }
-  @keyframes carMove {
-    0% { left: 16px; }
-    50% { left: 70%; }
-    100% { left: 16px; }
-  }
-  .nav-dest { font-size: 13px; margin-top: 6px; color: var(--text2); }
+  .nav-card .route-summary span { color: var(--accent); font-weight: 600; }
+  .nav-dest { font-size: 13px; margin-top: 4px; color: var(--text2); }
   .nav-dest strong { color: var(--text); }
+  /* Dark map tiles fix */
+  .leaflet-control-zoom a { background: #1a1a2e !important; color: var(--text) !important; border-color: var(--border) !important; }
+  .leaflet-control-attribution { display: none !important; }
 
   /* Music */
   .music-card .eq-bars { display: flex; align-items: flex-end; gap: 3px; height: 40px; margin-top: 4px; }
@@ -225,7 +212,7 @@
   .speed-num { font-size: 28px; font-weight: 700; line-height: 1; }
   .speed-unit { font-size: 10px; color: var(--text2); }
 
-  /* ── Assistant Panel ── */
+  /* 鈹€鈹€ Assistant Panel 鈹€鈹€ */
   .assistant {
     background: rgba(14,18,30,0.9);
     display: flex;
@@ -387,15 +374,15 @@
 <div class="bg-grid"></div>
 
 <!-- Demo banner -->
-<div class="demo-banner" id="demoBtn" title="自动演示全部功能">
-  <span class="dot"></span> 演示模式
+<div class="demo-banner" id="demoBtn" title="鑷姩婕旂ず鍏ㄩ儴鍔熻兘">
+  <span class="dot"></span> 婕旂ず妯″紡
 </div>
 
 <!-- Top bar -->
 <div class="topbar">
   <span class="time" id="timeDisplay">14:30</span>
-  <span class="weather"><span>☀️</span> 晴 · 24°C</span>
-  <span class="status-dot"></span><span class="status-label">Agent 在线</span>
+  <span class="weather"><span>鈽€锔?/span> 鏅?路 24掳C</span>
+  <span class="status-dot"></span><span class="status-label">Agent 鍦ㄧ嚎</span>
   <span class="brand">Cockpit Copilot</span>
 </div>
 
@@ -407,7 +394,7 @@
 
     <!-- Speed -->
     <div class="card">
-      <div class="label">⏱ 行驶状态</div>
+      <div class="label">鈴?琛岄┒鐘舵€?/div>
       <div style="display:flex; align-items:center; gap:16px;">
         <div class="speed-gauge">
           <div class="speed-inner">
@@ -416,40 +403,41 @@
           </div>
         </div>
         <div>
-          <div style="font-size:12px;color:var(--text2);">续航</div>
+          <div style="font-size:12px;color:var(--text2);">缁埅</div>
           <div style="font-size:20px;font-weight:700;">312 <span style="font-size:12px;color:var(--text2);">km</span></div>
-          <div style="font-size:12px;color:var(--green);">⚡ 82%</div>
+          <div style="font-size:12px;color:var(--green);">鈿?82%</div>
         </div>
       </div>
     </div>
 
     <!-- Temperature -->
     <div class="card" id="tempCard">
-      <div class="label">🌡 座舱温度</div>
+      <div class="label">馃尅 搴ц埍娓╁害</div>
       <div class="temp-row">
-        <div class="temp-ring cold" id="tempRing">24°</div>
+        <div class="temp-ring cold" id="tempRing">24掳</div>
         <div>
-          <div class="value" style="font-size:28px;" id="tempVal">24<span class="unit">°C</span></div>
-          <div class="sub">AUTO · 外循环</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:2px;" id="seatHeat">座椅加热 · 关闭</div>
+          <div class="value" style="font-size:28px;" id="tempVal">24<span class="unit">掳C</span></div>
+          <div class="sub">AUTO 路 澶栧惊鐜?/div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px;" id="seatHeat">搴ф鍔犵儹 路 鍏抽棴</div>
         </div>
       </div>
     </div>
 
     <!-- Navigation -->
     <div class="card nav-card" id="navCard">
-      <div class="label">🗺 导航</div>
-      <div class="mini-map">
-        <div class="route-line"></div>
-        <div class="car-dot"></div>
+      <div class="label">馃椇 瀵艰埅</div>
+      <div class="map-container" id="navMap"></div>
+      <div class="route-summary">
+        <span id="navETA">-- min</span> 鍓╀綑
+        <span id="navDist">-- km</span> 閲岀▼
       </div>
-      <div class="nav-dest" id="navDest">未设置目的地</div>
+      <div class="nav-dest" id="navDest">鏈缃洰鐨勫湴</div>
     </div>
 
     <!-- Music -->
     <div class="card music-card" id="musicCard">
-      <div class="label">🎵 媒体</div>
-      <div style="font-size:13px;font-weight:600;" id="musicTitle">未播放</div>
+      <div class="label">馃幍 濯掍綋</div>
+      <div style="font-size:13px;font-weight:600;" id="musicTitle">鏈挱鏀?/div>
       <div class="eq-bars" id="eqBars">
         <div class="eq-bar" style="height:6px;"></div><div class="eq-bar" style="height:6px;"></div>
         <div class="eq-bar" style="height:6px;"></div><div class="eq-bar" style="height:6px;"></div>
@@ -460,23 +448,23 @@
 
     <!-- Ambient Light -->
     <div class="card" id="lightCard">
-      <div class="label">💡 氛围灯</div>
+      <div class="label">馃挕 姘涘洿鐏?/div>
       <div class="light-row">
         <div class="light-circle" id="lightCircle" style="background:#334155;box-shadow:none;"></div>
         <div>
-          <div style="font-size:14px;font-weight:600;" id="lightName">关闭</div>
-          <div class="sub" id="lightBright">亮度 0%</div>
+          <div style="font-size:14px;font-weight:600;" id="lightName">鍏抽棴</div>
+          <div class="sub" id="lightBright">浜害 0%</div>
         </div>
       </div>
     </div>
 
     <!-- Drive Mode -->
     <div class="card" id="modeCard">
-      <div class="label">🚗 驾驶模式</div>
+      <div class="label">馃殫 椹鹃┒妯″紡</div>
       <div style="margin-top:4px;">
         <span class="mode-badge mode-comfort" id="modeBadge">COMFORT</span>
       </div>
-      <div class="sub" id="modeDesc">标准舒适调校</div>
+      <div class="sub" id="modeDesc">鏍囧噯鑸掗€傝皟鏍?/div>
     </div>
 
   </div>
@@ -484,22 +472,21 @@
   <!-- Assistant -->
   <div class="assistant">
     <div class="assistant-header">
-      <div class="ai-icon">🤖</div>
+      <div class="ai-icon">馃</div>
       <div>
-        <div class="ai-title">座舱助手</div>
-        <div class="ai-sub">语音/文字 · 持续在线</div>
+        <div class="ai-title">搴ц埍鍔╂墜</div>
+        <div class="ai-sub">璇煶/鏂囧瓧 路 鎸佺画鍦ㄧ嚎</div>
       </div>
       <div style="margin-left:auto;display:flex;gap:6px;">
-        <button class="btn ghost" onclick="clearChat()">清空</button>
+        <button class="btn ghost" onclick="clearChat()">娓呯┖</button>
       </div>
     </div>
 
     <div class="chat-area" id="chatArea">
       <div class="msg agent">
-        你好，我是座舱 AI 助手。<br>
-        你可以用自然语言控制温度、导航、音乐、氛围灯和驾驶模式。<br>
-        试试说「有点冷」「导航到公司」「放点音乐」👋
-      </div>
+        浣犲ソ锛屾垜鏄骇鑸?AI 鍔╂墜銆?br>
+        浣犲彲浠ョ敤鑷劧璇█鎺у埗娓╁害銆佸鑸€侀煶涔愩€佹皼鍥寸伅鍜岄┚椹舵ā寮忋€?br>
+        璇曡瘯璇淬€屾湁鐐瑰喎銆嶃€屽鑸埌鍏徃銆嶃€屾斁鐐归煶涔愩€嶐煈?      </div>
     </div>
 
     <div class="typing" id="typing">
@@ -507,159 +494,291 @@
     </div>
 
     <div class="chips" id="chipRow">
-      <span class="chip" onclick="sendMsg('有点冷')">🥶 有点冷</span>
-      <span class="chip" onclick="sendMsg('导航到最近充电站')">🔌 找充电站</span>
-      <span class="chip" onclick="sendMsg('播放轻音乐')">🎵 放音乐</span>
-      <span class="chip" onclick="sendMsg('切换运动模式')">🏎️ 运动模式</span>
-      <span class="chip" onclick="sendMsg('氛围灯调成蓝色')">💙 蓝色灯光</span>
+      <span class="chip" onclick="sendMsg('鏈夌偣鍐?)">馃ザ 鏈夌偣鍐?/span>
+      <span class="chip" onclick="sendMsg('瀵艰埅鍒板浗璐?)">馃椇 瀵艰埅鍒板浗璐?/span>
+      <span class="chip" onclick="sendMsg('鎾斁杞婚煶涔?)">馃幍 鏀鹃煶涔?/span>
+      <span class="chip" onclick="sendMsg('鍒囨崲杩愬姩妯″紡')">馃弾锔?杩愬姩妯″紡</span>
+      <span class="chip" onclick="sendMsg('姘涘洿鐏皟鎴愯摑鑹?)">馃挋 钃濊壊鐏厜</span>
     </div>
 
     <div class="input-area">
-      <input type="text" id="userInput" placeholder="说出你的需求……" onkeydown="if(event.key==='Enter')sendMsg()">
-      <button class="btn" onclick="sendMsg()">发送</button>
+      <input type="text" id="userInput" placeholder="璇村嚭浣犵殑闇€姹傗€︹€? onkeydown="if(event.key==='Enter')sendMsg()">
+      <button class="btn" onclick="sendMsg()">鍙戦€?/button>
     </div>
   </div>
 
 </div>
 
 <script>
-// ═══════════════════════════════════════
-//  智能座舱 AI Agent 核心引擎
+// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?//  鏅鸿兘搴ц埍 AI Agent 鏍稿績寮曟搸
 //  Cockpit Copilot v1.0
-// ═══════════════════════════════════════
-
-// ── 座舱状态 ──
+// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?
+// 鈹€鈹€ 搴ц埍鐘舵€?鈹€鈹€
 const state = {
   temperature: 24,
   seatHeat: false,
   navigation: null,
   music: null,
-  ambientLight: { color: '#334155', name: '关闭', brightness: 0 },
+  ambientLight: { color: '#334155', name: '鍏抽棴', brightness: 0 },
   driveMode: 'comfort',
   speed: 0,
   history: [],
   contextAware: true
 };
 
-// ── 上下文感知数据 ──
+// 鈹€鈹€ 鍦板浘涓庡鑸姸鎬?鈹€鈹€
+let navMap = null;
+let navCarMarker = null;
+let navRouteLine = null;
+let navMoveTimer = null;
+let navProgress = 0;
+const navCurrentPos = { lat: 39.9142, lng: 116.4074 }; // 榛樿锛氬寳浜笢鍩庡尯
+const navDestinations = {
+  '鍏徃':      { lat: 39.9842, lng: 116.3074, name: '鍏徃锛堜腑鍏虫潙杞欢鍥級' },
+  '瀹?:        { lat: 39.9042, lng: 116.4274, name: '瀹讹紙鏈濋槼鍖猴級' },
+  '鍖椾含鍗楃珯':  { lat: 39.8649, lng: 116.3790, name: '鍖椾含鍗楃珯' },
+  '棣栭兘鏈哄満':  { lat: 40.0799, lng: 116.6031, name: '棣栭兘鍥介檯鏈哄満' },
+  '鍥借锤':      { lat: 39.9087, lng: 116.4605, name: '鍥借锤CBD' },
+  '涓叧鏉?:    { lat: 39.9842, lng: 116.3074, name: '涓叧鏉? },
+  '涓夐噷灞?:    { lat: 39.9322, lng: 116.4551, name: '涓夐噷灞? },
+  '鏈涗含':      { lat: 39.9982, lng: 116.4815, name: '鏈涗含SOHO' },
+  '瑗垮崟':      { lat: 39.9087, lng: 116.3736, name: '瑗垮崟' },
+  '鐜嬪簻浜?:    { lat: 39.9142, lng: 116.4174, name: '鐜嬪簻浜? }
+};
+let navDest = null;
+
+// 鈹€鈹€ 涓婁笅鏂囨劅鐭ユ暟鎹?鈹€鈹€
 const context = {
   time: '14:30',
   hour: 14,
-  weather: '晴',
+  weather: '鏅?,
   outsideTemp: 24,
   battery: 82
 };
 
-// ── 耗时模拟（让交互感觉自然） ──
+// 鈹€鈹€ 鑰楁椂妯℃嫙锛堣浜や簰鎰熻鑷劧锛?鈹€鈹€
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ── Function Definitions（Agent 可调用的能力） ──
+// 鈹€鈹€ Function Definitions锛圓gent 鍙皟鐢ㄧ殑鑳藉姏锛?鈹€鈹€
 const functions = {
   set_temperature: {
     name: 'set_temperature',
-    description: '设置座舱温度',
+    description: '璁剧疆搴ц埍娓╁害',
     params: ['value'],
     validate: (v) => !isNaN(v) && v >= 16 && v <= 32,
     execute(val) {
       const v = parseInt(val);
       state.temperature = v;
       updateTempUI();
-      return { action: `温度已调至 ${v}°C`, detail: this.description };
+      return { action: `娓╁害宸茶皟鑷?${v}掳C`, detail: this.description };
     }
   },
   set_seat_heat: {
     name: 'set_seat_heat',
-    description: '开关座椅加热',
+    description: '寮€鍏冲骇妞呭姞鐑?,
     params: ['on/off'],
     execute(val) {
-      state.seatHeat = (val === 'on' || val === 'true' || val === '开');
+      state.seatHeat = (val === 'on' || val === 'true' || val === '寮€');
       updateTempUI();
-      return { action: `座椅加热已${state.seatHeat ? '开启' : '关闭'}` };
+      return { action: `搴ф鍔犵儹宸?{state.seatHeat ? '寮€鍚? : '鍏抽棴'}` };
     }
   },
   navigate_to: {
     name: 'navigate_to',
-    description: '设置导航目的地',
+    description: '璁剧疆瀵艰埅鐩殑鍦板苟鏄剧ず鐪熷疄璺嚎',
     params: ['destination'],
     execute(val) {
       state.navigation = val;
-      updateNavUI();
-      return { action: `导航已设至「${val}」`, detail: '预计到达 14:55' };
+      // 鏅鸿兘鍖归厤鐩殑鍦板潗鏍?      let dest = null;
+      const lower = val.toLowerCase();
+      for (const [key, d] of Object.entries(navDestinations)) {
+        if (lower.includes(key.toLowerCase()) || key.includes(val)) {
+          dest = d; break;
+        }
+      }
+      if (!dest) {
+        // 榛樿鐩殑鍦帮細鏍规嵁鍏抽敭璇嶆ā绯婂尮閰?        if (lower.includes('鍏呯數')) dest = { lat: 39.9342, lng: 116.3974, name: val + '锛堟渶杩戝厖鐢电珯锛? };
+        else if (lower.includes('鍔犳补')) dest = { lat: 39.9242, lng: 116.3874, name: val + '锛堟渶杩戝姞娌圭珯锛? };
+        else if (lower.includes('鏈哄満')) dest = navDestinations['棣栭兘鏈哄満'];
+        else if (lower.includes('绔?)) dest = navDestinations['鍖椾含鍗楃珯'];
+        else dest = { lat: navCurrentPos.lat + (Math.random()-0.5)*0.04, lng: navCurrentPos.lng + (Math.random()-0.5)*0.04, name: val };
+      }
+      navDest = dest;
+      startNavigation(dest);
+      const eta = Math.round(calcDistance(navCurrentPos, dest) / 0.8);
+      return { action: `瀵艰埅宸茶鑷炽€?{dest.name}銆峘, detail: `棰勮 ${eta} 鍒嗛挓鍒拌揪 路 ${calcDistance(navCurrentPos, dest).toFixed(1)} km` };
     }
   },
   play_music: {
     name: 'play_music',
-    description: '播放音乐',
+    description: '鎾斁闊充箰',
     params: ['query'],
     execute(val) {
       state.music = val;
       updateMusicUI();
-      return { action: `正在播放「${val}」` };
+      return { action: `姝ｅ湪鎾斁銆?{val}銆峘 };
     }
   },
   set_ambient_light: {
     name: 'set_ambient_light',
-    description: '设置氛围灯颜色和亮度',
+    description: '璁剧疆姘涘洿鐏鑹插拰浜害',
     params: ['color', 'brightness'],
     execute(val) {
       const colorMap = {
-        '蓝': '#3b82f6', '蓝色': '#3b82f6',
-        '红': '#ef4444', '红色': '#ef4444',
-        '绿': '#22c55e', '绿色': '#22c55e',
-        '紫': '#a855f7', '紫色': '#a855f7',
-        '橙': '#f97316', '橙色': '#f97316',
-        '暖': '#f59e0b', '暖色': '#f59e0b',
-        '白': '#e2e8f0', '白色': '#e2e8f0',
-        '粉': '#ec4899', '粉色': '#ec4899',
-        '关闭': '#334155', '关': '#334155', '暗': '#334155'
+        '钃?: '#3b82f6', '钃濊壊': '#3b82f6',
+        '绾?: '#ef4444', '绾㈣壊': '#ef4444',
+        '缁?: '#22c55e', '缁胯壊': '#22c55e',
+        '绱?: '#a855f7', '绱壊': '#a855f7',
+        '姗?: '#f97316', '姗欒壊': '#f97316',
+        '鏆?: '#f59e0b', '鏆栬壊': '#f59e0b',
+        '鐧?: '#e2e8f0', '鐧借壊': '#e2e8f0',
+        '绮?: '#ec4899', '绮夎壊': '#ec4899',
+        '鍏抽棴': '#334155', '鍏?: '#334155', '鏆?: '#334155'
       };
       const c = colorMap[val] || '#3b82f6';
-      const nameMap = { '#3b82f6':'冰蓝','#ef4444':'炽红','#22c55e':'翠绿',
-        '#a855f7':'星紫','#f97316':'暖橙','#f59e0b':'琥珀','#e2e8f0':'柔白',
-        '#ec4899':'樱粉','#334155':'关闭' };
+      const nameMap = { '#3b82f6':'鍐拌摑','#ef4444':'鐐界孩','#22c55e':'缈犵豢',
+        '#a855f7':'鏄熺传','#f97316':'鏆栨','#f59e0b':'鐞ョ弨','#e2e8f0':'鏌旂櫧',
+        '#ec4899':'妯辩矇','#334155':'鍏抽棴' };
       state.ambientLight = { color: c, name: nameMap[c] || val, brightness: c === '#334155' ? 0 : 70 };
       updateLightUI();
-      return { action: `氛围灯 → ${state.ambientLight.name}`, detail: `亮度 ${state.ambientLight.brightness}%` };
+      return { action: `姘涘洿鐏?鈫?${state.ambientLight.name}`, detail: `浜害 ${state.ambientLight.brightness}%` };
     }
   },
   set_drive_mode: {
     name: 'set_drive_mode',
-    description: '切换驾驶模式',
+    description: '鍒囨崲椹鹃┒妯″紡',
     params: ['mode'],
     execute(val) {
       const modeMap = {
-        '舒适': 'comfort', '舒适模式': 'comfort', 'comfort': 'comfort',
-        '运动': 'sport', '运动模式': 'sport', 'sport': 'sport',
-        '节能': 'eco', 'eco模式': 'eco', '节能模式': 'eco', 'eco': 'eco',
-        '雪地': 'snow', '雪地模式': 'snow', 'snow': 'snow'
+        '鑸掗€?: 'comfort', '鑸掗€傛ā寮?: 'comfort', 'comfort': 'comfort',
+        '杩愬姩': 'sport', '杩愬姩妯″紡': 'sport', 'sport': 'sport',
+        '鑺傝兘': 'eco', 'eco妯″紡': 'eco', '鑺傝兘妯″紡': 'eco', 'eco': 'eco',
+        '闆湴': 'snow', '闆湴妯″紡': 'snow', 'snow': 'snow'
       };
       state.driveMode = modeMap[val] || 'comfort';
       updateModeUI();
-      const modeNames = { comfort:'舒适模式', sport:'运动模式', eco:'节能模式', snow:'雪地模式' };
-      const modeDescs = { comfort:'悬挂舒适 · 转向轻盈', sport:'悬挂硬化 · 动力响应敏捷',
-        eco:'最优能效 · 空调降功率', snow:'低扭输出 · 防滑优先' };
-      return { action: `驾驶模式 → ${modeNames[state.driveMode]}`, detail: modeDescs[state.driveMode] };
+      const modeNames = { comfort:'鑸掗€傛ā寮?, sport:'杩愬姩妯″紡', eco:'鑺傝兘妯″紡', snow:'闆湴妯″紡' };
+      const modeDescs = { comfort:'鎮寕鑸掗€?路 杞悜杞荤泩', sport:'鎮寕纭寲 路 鍔ㄥ姏鍝嶅簲鏁忔嵎',
+        eco:'鏈€浼樿兘鏁?路 绌鸿皟闄嶅姛鐜?, snow:'浣庢壄杈撳嚭 路 闃叉粦浼樺厛' };
+      return { action: `椹鹃┒妯″紡 鈫?${modeNames[state.driveMode]}`, detail: modeDescs[state.driveMode] };
     }
   }
 };
 
-// ── UI 更新函数 ──
+// 鈹€鈹€ UI 鏇存柊鍑芥暟 鈹€鈹€
 function updateTempUI() {
-  document.getElementById('tempVal').innerHTML = state.temperature + '<span class="unit">°C</span>';
-  document.getElementById('tempRing').textContent = state.temperature + '°';
+  document.getElementById('tempVal').innerHTML = state.temperature + '<span class="unit">掳C</span>';
+  document.getElementById('tempRing').textContent = state.temperature + '掳';
   const ring = document.getElementById('tempRing');
   ring.className = 'temp-ring ' + (state.temperature <= 21 ? 'cold' : 'warm');
-  document.getElementById('seatHeat').textContent = '座椅加热 · ' + (state.seatHeat ? '已开启 🔥' : '关闭');
+  document.getElementById('seatHeat').textContent = '搴ф鍔犵儹 路 ' + (state.seatHeat ? '宸插紑鍚?馃敟' : '鍏抽棴');
   flashCard('tempCard');
 }
 function updateNavUI() {
   document.getElementById('navDest').innerHTML = state.navigation
-    ? '目的地：<strong>' + state.navigation + '</strong> · 预计 15:05 到达'
-    : '未设置目的地';
+    ? '鐩殑鍦帮細<strong>' + (navDest ? navDest.name : state.navigation) + '</strong>'
+    : '鏈缃洰鐨勫湴';
+}
+
+// 鈹€鈹€ 鍦板浘涓庡鑸紩鎿?鈹€鈹€
+function calcDistance(a, b) {
+  const R = 6371;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const s = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+function initMap() {
+  if (navMap) return;
+  navMap = L.map('navMap', {
+    center: [navCurrentPos.lat, navCurrentPos.lng],
+    zoom: 13,
+    zoomControl: false,
+    attributionControl: false
+  });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 18
+  }).addTo(navMap);
+  // 褰撳墠杞﹁締浣嶇疆鏍囪
+  navCarMarker = L.circleMarker([navCurrentPos.lat, navCurrentPos.lng], {
+    radius: 7,
+    color: '#00d4ff',
+    fillColor: '#00d4ff',
+    fillOpacity: 0.9,
+    weight: 2
+  }).addTo(navMap).bindTooltip('褰撳墠浣嶇疆', {permanent: false, direction:'top'});
+  setTimeout(() => navMap.invalidateSize(), 300);
+}
+function startNavigation(dest) {
+  initMap();
+  if (navRouteLine) navMap.removeLayer(navRouteLine);
+  if (navMoveTimer) clearInterval(navMoveTimer);
+  navProgress = 0;
+  // 缁樺埗璺嚎
+  const from = navCurrentPos;
+  const to = dest;
+  // 璐濆灏旀洸绾挎ā鎷熼亾璺集鏇?  const midLat = (from.lat + to.lat) / 2 + (Math.random() - 0.5) * 0.015;
+  const midLng = (from.lng + to.lng) / 2 + (Math.random() - 0.5) * 0.015;
+  const pts = [];
+  for (let i = 0; i <= 20; i++) {
+    const t = i / 20;
+    const lat = (1-t)*(1-t)*from.lat + 2*(1-t)*t*midLat + t*t*to.lat;
+    const lng = (1-t)*(1-t)*from.lng + 2*(1-t)*t*midLng + t*t*to.lng;
+    pts.push([lat, lng]);
+  }
+  navRouteLine = L.polyline(pts, {
+    color: '#00d4ff',
+    weight: 3,
+    opacity: 0.7,
+    dashArray: '8 6',
+    lineCap: 'round'
+  }).addTo(navMap);
+  // 缁堢偣鏍囪
+  const destMarker = L.circleMarker([to.lat, to.lng], {
+    radius: 5,
+    color: '#a78bfa',
+    fillColor: '#a78bfa',
+    fillOpacity: 0.8,
+    weight: 2
+  }).addTo(navMap).bindTooltip(dest.name, {permanent: true, direction:'top'});
+  // 璋冩暣瑙嗛噹
+  navMap.fitBounds([[from.lat, from.lng], [to.lat, to.lng]], {padding: [25, 25]});
+  // 绉诲姩杞﹁締鏍囪
+  animateCar(pts);
+  // 鏇存柊 UI
+  const dist = calcDistance(from, to);
+  const eta = Math.round(dist / 0.6);
+  document.getElementById('navETA').textContent = eta;
+  document.getElementById('navDist').textContent = dist.toFixed(1);
+  updateNavUI();
   flashCard('navCard');
 }
+function animateCar(route) {
+  navMoveTimer = setInterval(() => {
+    navProgress += 0.008;
+    if (navProgress >= 1) { navProgress = 0; }
+    const idx = Math.floor(navProgress * (route.length - 1));
+    const nextIdx = Math.min(idx + 1, route.length - 1);
+    const t = navProgress * (route.length - 1) - idx;
+    const lat = route[idx][0] + (route[nextIdx][0] - route[idx][0]) * t;
+    const lng = route[idx][1] + (route[nextIdx][1] - route[idx][1]) * t;
+    navCarMarker.setLatLng([lat, lng]);
+  }, 120);
+}
+function resetNav() {
+  if (navMoveTimer) clearInterval(navMoveTimer);
+  if (navRouteLine && navMap) navMap.removeLayer(navRouteLine);
+  navProgress = 0;
+  state.navigation = null;
+  navDest = null;
+  if (navCarMarker && navMap) navCarMarker.setLatLng([navCurrentPos.lat, navCurrentPos.lng]);
+  document.getElementById('navDest').innerHTML = '鏈缃洰鐨勫湴';
+  document.getElementById('navETA').textContent = '-- min';
+  document.getElementById('navDist').textContent = '-- km';
+  if (navMap) navMap.setView([navCurrentPos.lat, navCurrentPos.lng], 13);
+}
 function updateMusicUI() {
-  document.getElementById('musicTitle').textContent = state.music || '未播放';
+  document.getElementById('musicTitle').textContent = state.music || '鏈挱鏀?;
   const bars = document.querySelectorAll('#eqBars .eq-bar');
   bars.forEach((b,i) => {
     if (state.music) {
@@ -679,13 +798,13 @@ function updateLightUI() {
     ? '0 0 24px ' + l.color + ', 0 0 48px ' + l.color + '44'
     : 'none';
   document.getElementById('lightName').textContent = l.name;
-  document.getElementById('lightBright').textContent = '亮度 ' + l.brightness + '%';
+  document.getElementById('lightBright').textContent = '浜害 ' + l.brightness + '%';
   flashCard('lightCard');
 }
 function updateModeUI() {
-  const modeNames = { comfort:'舒适模式', sport:'运动模式', eco:'节能模式', snow:'雪地模式' };
-  const modeDescs = { comfort:'悬挂舒适 · 转向轻盈', sport:'悬挂硬化 · 动力响应敏捷',
-    eco:'最优能效 · 空调降功率', snow:'低扭输出 · 防滑优先' };
+  const modeNames = { comfort:'鑸掗€傛ā寮?, sport:'杩愬姩妯″紡', eco:'鑺傝兘妯″紡', snow:'闆湴妯″紡' };
+  const modeDescs = { comfort:'鎮寕鑸掗€?路 杞悜杞荤泩', sport:'鎮寕纭寲 路 鍔ㄥ姏鍝嶅簲鏁忔嵎',
+    eco:'鏈€浼樿兘鏁?路 绌鸿皟闄嶅姛鐜?, snow:'浣庢壄杈撳嚭 路 闃叉粦浼樺厛' };
   const badge = document.getElementById('modeBadge');
   badge.textContent = modeNames[state.driveMode].toUpperCase();
   badge.className = 'mode-badge mode-' + state.driveMode;
@@ -698,199 +817,197 @@ function flashCard(id) {
   setTimeout(() => el.classList.remove('active'), 800);
 }
 
-// ── 上下文感知引擎 ──
+// 鈹€鈹€ 涓婁笅鏂囨劅鐭ュ紩鎿?鈹€鈹€
 function getContextSuggestions() {
   const tips = [];
   if (context.hour >= 22 || context.hour < 6) {
-    tips.push('检测到夜间驾驶，建议调暗仪表盘亮度并开启柔白氛围灯');
+    tips.push('妫€娴嬪埌澶滈棿椹鹃┒锛屽缓璁皟鏆椾华琛ㄧ洏浜害骞跺紑鍚煍鐧芥皼鍥寸伅');
   }
   if (context.hour >= 6 && context.hour < 9) {
-    tips.push('早上好！需要导航到常去地点吗？');
+    tips.push('鏃╀笂濂斤紒闇€瑕佸鑸埌甯稿幓鍦扮偣鍚楋紵');
   }
   if (state.temperature < 20 && !state.seatHeat) {
-    tips.push('当前温度偏低，需要开启座椅加热吗？');
+    tips.push('褰撳墠娓╁害鍋忎綆锛岄渶瑕佸紑鍚骇妞呭姞鐑悧锛?);
   }
-  if (state.driveMode === 'sport' && state.ambientLight.name === '关闭') {
-    tips.push('运动模式下推荐配合红色氛围灯，增强驾驶氛围感');
+  if (state.driveMode === 'sport' && state.ambientLight.name === '鍏抽棴') {
+    tips.push('杩愬姩妯″紡涓嬫帹鑽愰厤鍚堢孩鑹叉皼鍥寸伅锛屽寮洪┚椹舵皼鍥存劅');
   }
   if (context.outsideTemp > 30 && state.temperature > 26) {
-    tips.push('室外温度较高，建议将空调设在 24-26°C 以平衡舒适度和能耗');
+    tips.push('瀹ゅ娓╁害杈冮珮锛屽缓璁皢绌鸿皟璁惧湪 24-26掳C 浠ュ钩琛¤垝閫傚害鍜岃兘鑰?);
   }
   return tips;
 }
 
-// ── Agent 意图识别引擎（模拟 LLM Function Calling） ──
+// 鈹€鈹€ Agent 鎰忓浘璇嗗埆寮曟搸锛堟ā鎷?LLM Function Calling锛?鈹€鈹€
 function agentThink(input) {
   const q = input.trim();
   const lower = q.toLowerCase();
 
-  // ===== 温度相关 =====
-  const tempMatch = q.match(/(\d+)\s*度/);
+  // ===== 娓╁害鐩稿叧 =====
+  const tempMatch = q.match(/(\d+)\s*搴?);
   if (tempMatch) {
     const v = parseInt(tempMatch[1]);
     if (v >= 16 && v <= 32) {
       return { func: 'set_temperature', val: v, confidence: 0.95,
-        natural: `好的，温度调至 ${v}°C ✅` };
+        natural: `濂界殑锛屾俯搴﹁皟鑷?${v}掳C 鉁卄 };
     }
   }
-  if (lower.includes('冷') || lower.includes('凉') || lower.includes('冻')) {
+  if (lower.includes('鍐?) || lower.includes('鍑?) || lower.includes('鍐?)) {
     const target = Math.min(state.temperature + 2, 32);
     const extras = [];
-    if (state.temperature <= 18) extras.push('需要同时打开座椅加热吗？');
+    if (state.temperature <= 18) extras.push('闇€瑕佸悓鏃舵墦寮€搴ф鍔犵儹鍚楋紵');
     return { func: 'set_temperature', val: target, confidence: 0.92,
-      natural: `检测到您感觉偏冷，温度 ${state.temperature}→${target}°C 🔥${extras.length ? '\n' + extras.join('\n') : ''}` };
+      natural: `妫€娴嬪埌鎮ㄦ劅瑙夊亸鍐凤紝娓╁害 ${state.temperature}鈫?{target}掳C 馃敟${extras.length ? '\n' + extras.join('\n') : ''}` };
   }
-  if (lower.includes('热') || lower.includes('闷')) {
+  if (lower.includes('鐑?) || lower.includes('闂?)) {
     const target = Math.max(state.temperature - 2, 16);
     return { func: 'set_temperature', val: target, confidence: 0.92,
-      natural: `帮您降温，温度 ${state.temperature}→${target}°C ❄️` };
+      natural: `甯偍闄嶆俯锛屾俯搴?${state.temperature}鈫?{target}掳C 鉂勶笍` };
   }
-  if (lower.includes('座椅加热') || lower.includes('加热')) {
-    const on = !lower.includes('关') && !lower.includes('停');
+  if (lower.includes('搴ф鍔犵儹') || lower.includes('鍔犵儹')) {
+    const on = !lower.includes('鍏?) && !lower.includes('鍋?);
     return { func: 'set_seat_heat', val: on ? 'on' : 'off', confidence: 0.95,
-      natural: on ? '座椅加热已开启 🔥' : '座椅加热已关闭' };
+      natural: on ? '搴ф鍔犵儹宸插紑鍚?馃敟' : '搴ф鍔犵儹宸插叧闂? };
   }
 
-  // ===== 导航相关 =====
-  const navMatch = q.match(/导航到(.+)/) || q.match(/去(.+)/) || q.match(/到(.+)去/);
-  if (navMatch || lower.includes('充电') || lower.includes('加油站') || lower.includes('回家') || lower.includes('公司')) {
+  // ===== 瀵艰埅鐩稿叧 =====
+  const navMatch = q.match(/瀵艰埅鍒?.+)/) || q.match(/鍘?.+)/) || q.match(/鍒?.+)鍘?);
+  if (navMatch || lower.includes('鍏呯數') || lower.includes('鍔犳补绔?) || lower.includes('鍥炲') || lower.includes('鍏徃')) {
     let dest = '';
     if (navMatch) dest = navMatch[1].trim();
-    else if (lower.includes('充电')) dest = '最近充电站（特来电 · 1.2km）';
-    else if (lower.includes('加油站')) dest = '最近加油站（中石化 · 0.8km）';
-    else if (lower.includes('回家')) dest = '家（海淀区中关村）';
-    else if (lower.includes('公司')) dest = '公司';
+    else if (lower.includes('鍏呯數')) dest = '鏈€杩戝厖鐢电珯锛堢壒鏉ョ數 路 1.2km锛?;
+    else if (lower.includes('鍔犳补绔?)) dest = '鏈€杩戝姞娌圭珯锛堜腑鐭冲寲 路 0.8km锛?;
+    else if (lower.includes('鍥炲')) dest = '瀹讹紙娴锋穩鍖轰腑鍏虫潙锛?;
+    else if (lower.includes('鍏徃')) dest = '鍏徃';
     if (dest) {
       return { func: 'navigate_to', val: dest, confidence: 0.90,
-        natural: `已为您规划到「${dest}」的路线 🗺️\n预计到达时间：14:55` };
+        natural: `姝ｅ湪瑙勫垝鍒般€?{dest}銆嶇殑璺嚎鈥︹€ };
     }
   }
 
-  // ===== 音乐相关 =====
-  if (lower.includes('音乐') || lower.includes('播放') || lower.includes('放歌') || lower.includes('听')) {
-    let genre = '轻音乐';
-    if (lower.includes('轻')) genre = '钢琴轻音乐集';
-    else if (lower.includes('摇滚') || lower.includes('嗨')) genre = '驾驶摇滚歌单';
-    else if (lower.includes('古典')) genre = '古典乐精选';
-    else if (lower.includes('民谣')) genre = '民谣在路上';
-    else if (lower.includes('电子')) genre = '电子驰放';
+  // ===== 闊充箰鐩稿叧 =====
+  if (lower.includes('闊充箰') || lower.includes('鎾斁') || lower.includes('鏀炬瓕') || lower.includes('鍚?)) {
+    let genre = '杞婚煶涔?;
+    if (lower.includes('杞?)) genre = '閽㈢惔杞婚煶涔愰泦';
+    else if (lower.includes('鎽囨粴') || lower.includes('鍡?)) genre = '椹鹃┒鎽囨粴姝屽崟';
+    else if (lower.includes('鍙ゅ吀')) genre = '鍙ゅ吀涔愮簿閫?;
+    else if (lower.includes('姘戣埃')) genre = '姘戣埃鍦ㄨ矾涓?;
+    else if (lower.includes('鐢靛瓙')) genre = '鐢靛瓙椹版斁';
     return { func: 'play_music', val: genre, confidence: 0.88,
-      natural: `为您播放「${genre}」🎵` };
+      natural: `涓烘偍鎾斁銆?{genre}銆嶐煄礰 };
   }
 
-  // ===== 氛围灯相关 =====
-  const lightColors = ['蓝','红','绿','紫','橙','暖','白','粉','关'];
+  // ===== 姘涘洿鐏浉鍏?=====
+  const lightColors = ['钃?,'绾?,'缁?,'绱?,'姗?,'鏆?,'鐧?,'绮?,'鍏?];
   for (const c of lightColors) {
-    if (lower.includes('氛围灯') && (lower.includes(c) || c === '关')) {
+    if (lower.includes('姘涘洿鐏?) && (lower.includes(c) || c === '鍏?)) {
       return { func: 'set_ambient_light', val: c, confidence: 0.93,
-        natural: `氛围灯 → ${c === '关' ? '已关闭' : c + '色'} 💡` };
+        natural: `姘涘洿鐏?鈫?${c === '鍏? ? '宸插叧闂? : c + '鑹?} 馃挕` };
     }
   }
-  if (lower.includes('灯光') || lower.includes('氛围灯')) {
-    if (lower.includes('暗') || lower.includes('关') || lower.includes('灭')) {
-      return { func: 'set_ambient_light', val: '关闭', confidence: 0.90,
-        natural: '氛围灯已关闭 🌙' };
+  if (lower.includes('鐏厜') || lower.includes('姘涘洿鐏?)) {
+    if (lower.includes('鏆?) || lower.includes('鍏?) || lower.includes('鐏?)) {
+      return { func: 'set_ambient_light', val: '鍏抽棴', confidence: 0.90,
+        natural: '姘涘洿鐏凡鍏抽棴 馃寵' };
     }
-    return { func: 'set_ambient_light', val: '蓝', confidence: 0.70,
-      natural: '为您开启冰蓝氛围灯 💙\n（您可以指定其他颜色：红色、紫色、暖色等）' };
+    return { func: 'set_ambient_light', val: '钃?, confidence: 0.70,
+      natural: '涓烘偍寮€鍚啺钃濇皼鍥寸伅 馃挋\n锛堟偍鍙互鎸囧畾鍏朵粬棰滆壊锛氱孩鑹层€佺传鑹层€佹殩鑹茬瓑锛? };
   }
 
-  // ===== 驾驶模式 =====
-  if (lower.includes('舒适模式') || lower.includes('舒适')) {
-    return { func: 'set_drive_mode', val: '舒适', confidence: 0.95,
-      natural: '已切换至舒适模式 🚗\n悬挂变软，转向更轻盈' };
+  // ===== 椹鹃┒妯″紡 =====
+  if (lower.includes('鑸掗€傛ā寮?) || lower.includes('鑸掗€?)) {
+    return { func: 'set_drive_mode', val: '鑸掗€?, confidence: 0.95,
+      natural: '宸插垏鎹㈣嚦鑸掗€傛ā寮?馃殫\n鎮寕鍙樿蒋锛岃浆鍚戞洿杞荤泩' };
   }
-  if (lower.includes('运动模式') || lower.includes('运动')) {
-    return { func: 'set_drive_mode', val: '运动', confidence: 0.95,
-      natural: '已切换至运动模式 🏎️\n动力响应更敏捷，建议搭配红色氛围灯' };
+  if (lower.includes('杩愬姩妯″紡') || lower.includes('杩愬姩')) {
+    return { func: 'set_drive_mode', val: '杩愬姩', confidence: 0.95,
+      natural: '宸插垏鎹㈣嚦杩愬姩妯″紡 馃弾锔廫n鍔ㄥ姏鍝嶅簲鏇存晱鎹凤紝寤鸿鎼厤绾㈣壊姘涘洿鐏? };
   }
-  if (lower.includes('节能') || lower.includes('省电') || lower.includes('eco')) {
-    return { func: 'set_drive_mode', val: '节能', confidence: 0.95,
-      natural: '已切换至节能模式 🌿\n预计续航增加 8%，空调功率已降低' };
+  if (lower.includes('鑺傝兘') || lower.includes('鐪佺數') || lower.includes('eco')) {
+    return { func: 'set_drive_mode', val: '鑺傝兘', confidence: 0.95,
+      natural: '宸插垏鎹㈣嚦鑺傝兘妯″紡 馃尶\n棰勮缁埅澧炲姞 8%锛岀┖璋冨姛鐜囧凡闄嶄綆' };
   }
-  if (lower.includes('雪地') || lower.includes('防滑')) {
-    return { func: 'set_drive_mode', val: '雪地', confidence: 0.95,
-      natural: '已切换至雪地模式 ❄️\n低扭输出，防滑优先' };
+  if (lower.includes('闆湴') || lower.includes('闃叉粦')) {
+    return { func: 'set_drive_mode', val: '闆湴', confidence: 0.95,
+      natural: '宸插垏鎹㈣嚦闆湴妯″紡 鉂勶笍\n浣庢壄杈撳嚭锛岄槻婊戜紭鍏? };
   }
 
-  // ===== 复合意图检测 =====
-  // "切换到运动模式，氛围灯调成红色"
-  if (lower.includes('运动') && lower.includes('红')) {
+  // ===== 澶嶅悎鎰忓浘妫€娴?=====
+  // "鍒囨崲鍒拌繍鍔ㄦā寮忥紝姘涘洿鐏皟鎴愮孩鑹?
+  if (lower.includes('杩愬姩') && lower.includes('绾?)) {
     // Multi-step: execute both
     return { multi: [
-      { func: 'set_drive_mode', val: '运动' },
-      { func: 'set_ambient_light', val: '红' }
+      { func: 'set_drive_mode', val: '杩愬姩' },
+      { func: 'set_ambient_light', val: '绾? }
     ], confidence: 0.65,
-      natural: '收到！同时执行：\n• 切换至运动模式 🏎️\n• 氛围灯 → 炽红 💡\n这样调整可以吗？' };
+      natural: '鏀跺埌锛佸悓鏃舵墽琛岋細\n鈥?鍒囨崲鑷宠繍鍔ㄦā寮?馃弾锔廫n鈥?姘涘洿鐏?鈫?鐐界孩 馃挕\n杩欐牱璋冩暣鍙互鍚楋紵' };
   }
 
-  // ===== 模糊意图 =====
-  if (lower.includes('暗') || lower.includes('太亮')) {
-    return { func: 'set_ambient_light', val: '关闭', confidence: 0.55,
-      natural: '您是指关闭氛围灯，还是调暗仪表盘亮度？我先帮您关闭氛围灯，如需调整仪表盘请说「调暗仪表盘」🌙' };
+  // ===== 妯＄硦鎰忓浘 =====
+  if (lower.includes('鏆?) || lower.includes('澶寒')) {
+    return { func: 'set_ambient_light', val: '鍏抽棴', confidence: 0.55,
+      natural: '鎮ㄦ槸鎸囧叧闂皼鍥寸伅锛岃繕鏄皟鏆椾华琛ㄧ洏浜害锛熸垜鍏堝府鎮ㄥ叧闂皼鍥寸伅锛屽闇€璋冩暣浠〃鐩樿璇淬€岃皟鏆椾华琛ㄧ洏銆嶐煂? };
   }
 
-  if (lower.includes('跟上次一样') || lower.includes('还是')) {
+  if (lower.includes('璺熶笂娆′竴鏍?) || lower.includes('杩樻槸')) {
     return { confidence: 0.60,
-      natural: '让我想想上次的配置……是「舒适模式 + 冰蓝氛围灯 + 22°C + 轻音乐」吗？\n说是或否，我立刻执行 👀',
+      natural: '璁╂垜鎯虫兂涓婃鐨勯厤缃€︹€︽槸銆岃垝閫傛ā寮?+ 鍐拌摑姘涘洿鐏?+ 22掳C + 杞婚煶涔愩€嶅悧锛焅n璇存槸鎴栧惁锛屾垜绔嬪埢鎵ц 馃憖',
       needsConfirm: true };
   }
 
-  // ===== 闲聊/问候 =====
-  if (lower.includes('你好') || lower.includes('hi') || lower.includes('hello')) {
-    return { confidence: 0.99, natural: '你好！👋 我是座舱助手，温度、导航、音乐、灯光、驾驶模式随时听你调遣。' };
+  // ===== 闂茶亰/闂€?=====
+  if (lower.includes('浣犲ソ') || lower.includes('hi') || lower.includes('hello')) {
+    return { confidence: 0.99, natural: '浣犲ソ锛侌煈?鎴戞槸搴ц埍鍔╂墜锛屾俯搴︺€佸鑸€侀煶涔愩€佺伅鍏夈€侀┚椹舵ā寮忛殢鏃跺惉浣犺皟閬ｃ€? };
   }
-  if (lower.includes('谢谢') || lower.includes('多谢')) {
-    return { confidence: 0.99, natural: '不客气！安全驾驶，有需要随时叫我 😊' };
+  if (lower.includes('璋㈣阿') || lower.includes('澶氳阿')) {
+    return { confidence: 0.99, natural: '涓嶅姘旓紒瀹夊叏椹鹃┒锛屾湁闇€瑕侀殢鏃跺彨鎴?馃槉' };
   }
 
-  // ===== 兜底 =====
+  // ===== 鍏滃簳 =====
   return { confidence: 0.30,
-    natural: '抱歉，我还不太理解您的意思 🥺\n您可以试试：\n• 「有点冷/热」调节温度\n• 「导航到XXX」设置导航\n• 「播放音乐」开始播放\n• 「氛围灯XX色」调节灯光\n• 「切换运动/舒适/节能模式」' };
+    natural: '鎶辨瓑锛屾垜杩樹笉澶悊瑙ｆ偍鐨勬剰鎬?馃ズ\n鎮ㄥ彲浠ヨ瘯璇曪細\n鈥?銆屾湁鐐瑰喎/鐑€嶈皟鑺傛俯搴n鈥?銆屽鑸埌XXX銆嶈缃鑸猏n鈥?銆屾挱鏀鹃煶涔愩€嶅紑濮嬫挱鏀綷n鈥?銆屾皼鍥寸伅XX鑹层€嶈皟鑺傜伅鍏塡n鈥?銆屽垏鎹㈣繍鍔?鑸掗€?鑺傝兘妯″紡銆? };
 }
 
-// ── 消息处理 ──
+// 鈹€鈹€ 娑堟伅澶勭悊 鈹€鈹€
 async function sendMsg(text) {
   const input = text || document.getElementById('userInput').value.trim();
   if (!input) return;
   if (!text) document.getElementById('userInput').value = '';
 
-  // 用户消息
+  // 鐢ㄦ埛娑堟伅
   addMessage('user', input);
   state.history.push({ role: 'user', content: input });
 
-  // 打字动画
+  // 鎵撳瓧鍔ㄧ敾
   showTyping(true);
   await delay(600 + Math.random() * 400);
   showTyping(false);
 
-  // Agent 思考
-  const result = agentThink(input);
+  // Agent 鎬濊€?  const result = agentThink(input);
 
   if (result.multi) {
-    // 复合意图 → 中等置信度 → 先展示结果，请求确认
+    // 澶嶅悎鎰忓浘 鈫?涓瓑缃俊搴?鈫?鍏堝睍绀虹粨鏋滐紝璇锋眰纭
     for (const act of result.multi) {
       functions[act.func].execute(act.val);
     }
     addMessage('agent', result.natural, result.confidence);
   } else if (result.func && result.confidence >= 0.80) {
-    // 高置信度 → 直接执行
+    // 楂樼疆淇″害 鈫?鐩存帴鎵ц
     functions[result.func].execute(result.val);
     addMessage('agent', result.natural, result.confidence);
   } else if (result.func && result.confidence < 0.80) {
-    // 低置信度 → 展示解释 + 请求确认
+    // 浣庣疆淇″害 鈫?灞曠ず瑙ｉ噴 + 璇锋眰纭
     addMessage('agent', result.natural, result.confidence);
   } else {
-    // 纯文本回复
-    addMessage('agent', result.natural, result.confidence || 0.5);
+    // 绾枃鏈洖澶?    addMessage('agent', result.natural, result.confidence || 0.5);
   }
 
-  // 上下文感知提示（每 3 轮插入一次）
+  // 涓婁笅鏂囨劅鐭ユ彁绀猴紙姣?3 杞彃鍏ヤ竴娆★級
   if (state.history.length % 3 === 0 && state.contextAware) {
     const tips = getContextSuggestions();
     if (tips.length > 0) {
       await delay(1200);
-      addMessage('agent', '💡 ' + tips[0], 0.7);
+      addMessage('agent', '馃挕 ' + tips[0], 0.7);
     }
   }
 
@@ -905,12 +1022,12 @@ function addMessage(role, content, confidence) {
   let html = content.replace(/\n/g, '<br>');
   if (confidence !== undefined && role === 'agent') {
     let confClass = 'conf-high';
-    let confLabel = '高置信度 · 自动执行';
-    if (confidence < 0.60) { confClass = 'conf-low'; confLabel = '低置信度 · 需确认'; }
-    else if (confidence < 0.80) { confClass = 'conf-mid'; confLabel = '中置信度 · 建议确认'; }
+    let confLabel = '楂樼疆淇″害 路 鑷姩鎵ц';
+    if (confidence < 0.60) { confClass = 'conf-low'; confLabel = '浣庣疆淇″害 路 闇€纭'; }
+    else if (confidence < 0.80) { confClass = 'conf-mid'; confLabel = '涓疆淇″害 路 寤鸿纭'; }
     html += `<div class="conf ${confClass}"><span style="font-size:14px;">${
-      confidence >= 0.80 ? '✅' : confidence >= 0.60 ? '⚠️' : '🤔'
-    }</span> ${confLabel} · ${Math.round(confidence * 100)}%</div>`;
+      confidence >= 0.80 ? '鉁? : confidence >= 0.60 ? '鈿狅笍' : '馃'
+    }</span> ${confLabel} 路 ${Math.round(confidence * 100)}%</div>`;
   }
 
   div.innerHTML = html;
@@ -931,27 +1048,26 @@ function clearChat() {
   const chat = document.getElementById('chatArea');
   chat.innerHTML = `
     <div class="msg agent">
-      你好，我是座舱 AI 助手。<br>
-      你可以用自然语言控制温度、导航、音乐、氛围灯和驾驶模式。<br>
-      试试说「有点冷」「导航到公司」「放点音乐」👋
-    </div>`;
+      浣犲ソ锛屾垜鏄骇鑸?AI 鍔╂墜銆?br>
+      浣犲彲浠ョ敤鑷劧璇█鎺у埗娓╁害銆佸鑸€侀煶涔愩€佹皼鍥寸伅鍜岄┚椹舵ā寮忋€?br>
+      璇曡瘯璇淬€屾湁鐐瑰喎銆嶃€屽鑸埌鍏徃銆嶃€屾斁鐐归煶涔愩€嶐煈?    </div>`;
   state.history = [];
 }
 
-// ── 演示模式 ──
+// 鈹€鈹€ 婕旂ず妯″紡 鈹€鈹€
 let demoRunning = false;
 async function runDemo() {
   if (demoRunning) return;
   demoRunning = true;
   document.getElementById('demoBtn').style.opacity = '0.5';
   const demos = [
-    '有点冷',
-    '打开座椅加热',
-    '导航到最近充电站',
-    '播放古典音乐',
-    '切换运动模式，氛围灯调成红色',
-    '还是切换回舒适模式吧',
-    '谢谢'
+    '鏈夌偣鍐?,
+    '鎵撳紑搴ф鍔犵儹',
+    '瀵艰埅鍒板浗璐?,
+    '鎾斁鍙ゅ吀闊充箰',
+    '鍒囨崲杩愬姩妯″紡锛屾皼鍥寸伅璋冩垚绾㈣壊',
+    '杩樻槸鍒囨崲鍥炶垝閫傛ā寮忓惂',
+    '璋㈣阿'
   ];
   for (const msg of demos) {
     if (!demoRunning) break;
@@ -967,7 +1083,7 @@ document.getElementById('demoBtn').addEventListener('click', () => {
   setTimeout(runDemo, 300);
 });
 
-// ── 时间更新 ──
+// 鈹€鈹€ 鏃堕棿鏇存柊 鈹€鈹€
 function updateTime() {
   const now = new Date();
   const h = String(now.getHours()).padStart(2, '0');
@@ -975,19 +1091,21 @@ function updateTime() {
   document.getElementById('timeDisplay').textContent = h + ':' + m;
   context.hour = now.getHours();
   context.time = h + ':' + m;
-  // 模拟行驶速度
+  // 妯℃嫙琛岄┒閫熷害
   state.speed = Math.floor(30 + Math.random() * 60);
   document.getElementById('speedVal').textContent = state.speed;
 }
 setInterval(updateTime, 3000);
 updateTime();
 
-// ── 初始状态 ──
+// 鈹€鈹€ 鍒濆鐘舵€?鈹€鈹€
 updateTempUI();
-updateNavUI();
 updateMusicUI();
 updateLightUI();
 updateModeUI();
+// 鍦板浘寤惰繜鍒濆鍖栵紙绛?DOM 灏辩华 + 灏哄纭畾鍚庯級
+setTimeout(() => { initMap(); updateNavUI(); }, 500);
+// 绐楀彛灏哄鍙樺寲鏃堕噸鏂拌绠楀湴鍥?window.addEventListener('resize', () => { if (navMap) navMap.invalidateSize(); });
 </script>
 
 </body>
